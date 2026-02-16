@@ -670,9 +670,29 @@ function Manager({ user, lang, onLogout }) {
   const ppEntries = entries.filter(e => { const d = new Date(e.clock_in); return d >= pp.start && d <= pp.end && (ppEmpFilter === "all" || e.employee_id === ppEmpFilter); });
   const ppTotal = ppEntries.reduce((s, e) => s + parseFloat(hrs(e.clock_in, e.clock_out)), 0);
 
-  const addEmp = async () => { const data = { ...ef }; if (data.hourly_rate) data.hourly_rate = parseFloat(data.hourly_rate); else delete data.hourly_rate; await sb.post("employees", data); setEf({ name: "", pin: "", role: "Tile Setter", phone: "", hourly_rate: "" }); setModal(null); loadAll(); };
+  const addEmp = async () => {
+    const data = { ...ef };
+    if (data.hourly_rate) data.hourly_rate = parseFloat(data.hourly_rate); else delete data.hourly_rate;
+    try {
+      const res = await sb.post("employees", data);
+      if (res?.code || res?.message || res?.error) { alert("Add failed: " + JSON.stringify(res)); return; }
+      if (!Array.isArray(res) || res.length === 0) { alert("Unexpected response: " + JSON.stringify(res)); }
+    } catch (err) { alert("Add error: " + err.message); return; }
+    setEf({ name: "", pin: "", role: "Tile Setter", phone: "", hourly_rate: "" }); setModal(null); loadAll();
+  };
   const rmEmp = async (id) => { if (!confirm("Remove this employee?")) return; await sb.patch("employees", id, { active: false }); loadAll(); };
-  const saveEmpEdit = async () => { if (!editEmpData) return; const upd = { name: editEmpData.name, role: editEmpData.role, phone: editEmpData.phone, hourly_rate: editEmpData.hourly_rate ? parseFloat(editEmpData.hourly_rate) : null }; await sb.patch("employees", editEmpData.id, upd); setEditEmpData(null); setModal(null); loadAll(); };
+  const saveEmpEdit = async () => {
+    if (!editEmpData) return;
+    try {
+      const upd = { name: editEmpData.name, role: editEmpData.role, phone: editEmpData.phone || null };
+      if (editEmpData.hourly_rate !== "" && editEmpData.hourly_rate !== null && editEmpData.hourly_rate !== undefined) {
+        upd.hourly_rate = parseFloat(editEmpData.hourly_rate);
+      } else { upd.hourly_rate = null; }
+      const res = await sb.patch("employees", editEmpData.id, upd);
+      if (res?.code || res?.message) { alert("Save error: " + (res.message || JSON.stringify(res))); return; }
+    } catch (err) { alert("Save failed: " + err.message); return; }
+    setEditEmpData(null); setModal(null); loadAll();
+  };
   const addMgr = async () => { await sb.post("managers", mf); setMf({ email: "", password_hash: "", name: "", role: "manager" }); setModal(null); loadAll(); };
   const addProj = async () => { await sb.post("projects", pf); setPf({ name: "", address: "", notes: "", status: "active" }); setModal(null); loadAll(); };
   const postAnn = async () => { await sb.post("announcements", { ...af, author_id: user.id }); setAf({ title: "", body: "", urgent: false }); setModal(null); loadAll(); };
